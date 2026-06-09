@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KufarScan</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d0f14; --surface:#161a22; --surface2:#1e2330; --surface3:#252b3a;
+    --border:#2a3147; --accent:#f4d03f; --accent2:#e67e22;
+    --text:#e8ecf4; --text-muted:#7a8499; --text-dim:#4a5168;
+    --green:#2ecc71; --red:#e74c3c; --blue:#3498db; --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{font-family:'Golos Text',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+
+  /* TOP BAR */
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .tg-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--accent);cursor:pointer;}
+  .tg-logo span{color:var(--text-dim);font-size:12px;font-family:'Golos Text',sans-serif;letter-spacing:0;}
+  .search-row{display:flex;flex:1;gap:8px;}
+  .search-row input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Golos Text',sans-serif;font-size:14px;padding:8px 12px;outline:none;min-width:0;}
+  .search-row input:focus{border-color:var(--accent);}
+  .btn-find{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Golos Text',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap;}
+
+  /* FILTERS ROW */
+  .filters-row{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .filters-row::-webkit-scrollbar{display:none;}
+  .filter-chip{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-family:'Golos Text',sans-serif;font-size:11px;padding:5px 10px;border-radius:16px;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;}
+  .filter-chip.active{background:#f4d03f22;border-color:var(--accent);color:var(--accent);}
+
+  /* FILTER PANEL */
+  .filter-panel{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 12px;display:none;flex-shrink:0;}
+  .filter-panel.open{display:block;}
+  .fp-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .fp-label{font-size:11px;color:var(--text-dim);width:60px;flex-shrink:0;}
+  .fp-row input,.fp-row select{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Golos Text',sans-serif;font-size:12px;padding:6px 8px;outline:none;min-width:0;}
+  .fp-row select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a5168'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;}
+
+  /* STATS */
+  .stats-strip{display:none;background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 12px;gap:12px;overflow-x:auto;flex-shrink:0;}
+  .stats-strip.visible{display:flex;}
+  .stats-strip::-webkit-scrollbar{display:none;}
+  .stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;white-space:nowrap;flex-shrink:0;}
+  .sp-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;}
+  .sp-val{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;}
+  .sp-val.y{color:var(--accent);}
+  .sp-val.g{color:var(--green);}
+  .sp-val.b{color:var(--blue);}
+  .sp-val.r{color:var(--red);}
+
+  /* AI PANEL */
+  .ai-strip{display:none;background:#1a1f2e;border-bottom:1px solid var(--border);border-left:3px solid var(--accent);padding:10px 14px;flex-shrink:0;}
+  .ai-strip.visible{display:flex;gap:8px;align-items:flex-start;}
+  .ai-strip-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+  .ai-strip-text{font-size:12px;color:var(--text-muted);line-height:1.5;}
+
+  /* SCROLL AREA */
+  .scroll-area{flex:1;overflow-y:auto;padding:10px 10px 20px;-webkit-overflow-scrolling:touch;}
+  .scroll-area::-webkit-scrollbar{width:3px;}
+  .scroll-area::-webkit-scrollbar-thumb{background:var(--border);}
+
+  /* CARDS */
+  .cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;animation:fadeUp .3s ease both;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .card-img{position:relative;height:110px;background:var(--surface2);}
+  .card-img img{width:100%;height:100%;object-fit:cover;}
+  .card-img .no-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--text-dim);}
+  .card-price-badge{position:absolute;bottom:5px;right:5px;background:var(--accent);color:#000;font-weight:700;font-size:12px;padding:2px 7px;border-radius:5px;}
+  .deal-badge{position:absolute;top:5px;right:5px;background:#2ecc71;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;}
+  .cond-badge{position:absolute;top:5px;left:5px;background:rgba(0,0,0,.7);font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;}
+  .cond-badge.new{color:var(--green);}
+  .cond-badge.used{color:var(--accent2);}
+  .card-body{padding:8px;}
+  .card-title{font-size:11px;font-weight:600;line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .card-city{font-size:10px;color:var(--text-dim);}
+  .card-diff{font-size:10px;font-weight:600;margin-top:3px;}
+  .card-diff.low{color:var(--green);}
+  .card-diff.high{color:var(--red);}
+
+  /* SKELETON */
+  .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3) 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:4px;}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* TOOLBAR */
+  .toolbar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+  .toolbar-count{font-size:12px;color:var(--text-muted);}
+  .toolbar-count strong{color:var(--text);}
+  .sort-select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Golos Text',sans-serif;font-size:12px;padding:4px 20px 4px 8px;outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%234a5168'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;}
+
+  /* PAGINATION */
+  .pg-bar{display:flex;justify-content:center;gap:6px;padding:14px 0 4px;}
+  .pg-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);font-family:'Golos Text',sans-serif;font-size:13px;padding:8px 18px;border-radius:8px;cursor:pointer;}
+  .pg-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700;}
+
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:flex-end;}
+  .modal-overlay.active{display:flex;}
+  .modal-sheet{background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:88vh;overflow-y:auto;animation:slideUp .25s ease;}
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;}
+  .modal-img{width:100%;height:200px;object-fit:cover;}
+  .modal-no-img{width:100%;height:140px;display:flex;align-items:center;justify-content:center;font-size:48px;background:var(--surface2);}
+  .modal-gallery{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;}
+  .modal-gallery::-webkit-scrollbar{display:none;}
+  .modal-gallery img{width:64px;height:48px;object-fit:cover;border-radius:5px;border:2px solid transparent;flex-shrink:0;}
+  .modal-gallery img.active{border-color:var(--accent);}
+  .modal-body{padding:14px 16px 24px;}
+  .modal-title{font-size:16px;font-weight:700;margin-bottom:4px;line-height:1.3;}
+  .modal-price{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--accent);letter-spacing:1px;margin-bottom:12px;}
+  .modal-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+  .mf{background:var(--surface2);border-radius:7px;padding:8px 10px;}
+  .mf-l{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-dim);margin-bottom:2px;}
+  .mf-v{font-size:13px;font-weight:600;}
+  .modal-desc{font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:14px;}
+  .btn-open{display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-family:'Golos Text',sans-serif;font-weight:700;font-size:14px;border:none;border-radius:10px;padding:13px;width:100%;cursor:pointer;text-decoration:none;}
+
+  /* EMPTY / ERROR */
+  .center-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;text-align:center;padding:20px;}
+  .center-msg .icon{font-size:52px;opacity:.3;}
+  .center-msg .title{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--text-muted);letter-spacing:2px;}
+  .center-msg .sub{font-size:13px;color:var(--text-dim);}
+  .error-box{background:#e74c3c11;border:1px solid #e74c3c44;border-radius:8px;padding:12px;font-size:12px;color:var(--text-muted);line-height:1.5;}
+  .error-box strong{color:var(--red);}
+
+  /* QUICK CHIPS */
+  .quick-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;}
+  .qchip{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);font-family:'Golos Text',sans-serif;font-size:12px;padding:6px 12px;border-radius:16px;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tg-logo" onclick="goHome()">📡 <span>KufarScan</span></div>
+  <div class="search-row">
+    <input type="text" id="search-input" placeholder="iPhone, велосипед...">
+    <button class="btn-find" onclick="doSearch()">Найти</button>
+  </div>
+</div>
+
+<!-- FILTERS ROW -->
+<div class="filters-row" id="filters-row" style="display:none">
+  <button class="filter-chip active" onclick="setRegion(this,'')">🌍 Вся РБ</button>
+  <button class="filter-chip" onclick="setRegion(this,'Минск')">Минск</button>
+  <button class="filter-chip" onclick="setRegion(this,'Брест')">Брест</button>
+  <button class="filter-chip" onclick="setRegion(this,'Гродно')">Гродно</button>
+  <button class="filter-chip" onclick="setRegion(this,'Гомель')">Гомель</button>
+  <button class="filter-chip" onclick="setRegion(this,'Витебск')">Витебск</button>
+  <button class="filter-chip" onclick="setRegion(this,'Могилёв')">Могилёв</button>
+  <button class="filter-chip" onclick="setRegion(this,'Минская обл.')">Минская обл.</button>
+  <button class="filter-chip" onclick="setRegion(this,'Брестская обл.')">Брестская обл.</button>
+  <button class="filter-chip" id="chip-filters" onclick="toggleFilterPanel()">⚙ Фильтры</button>
+</div>
+
+<!-- FILTER PANEL -->
+<div class="filter-panel" id="filter-panel">
+  <div class="fp-row">
+    <span class="fp-label">Цена от</span>
+    <input type="number" id="price-from" placeholder="BYN">
+    <span class="fp-label" style="text-align:center">до</span>
+    <input type="number" id="price-to" placeholder="BYN">
+  </div>
+  <div class="fp-row">
+    <span class="fp-label">Состояние</span>
+    <select id="filter-condition">
+      <option value="">Любое</option>
+      <option value="new">Новое</option>
+      <option value="used">Б/у</option>
+    </select>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-strip" id="stats-strip">
+  <div class="stat-pill"><div class="sp-label">Найдено</div><div class="sp-val y" id="s-count">—</div></div>
+  <div class="stat-pill"><div class="sp-label">Средняя</div><div class="sp-val b" id="s-avg">—</div></div>
+  <div class="stat-pill"><div class="sp-label">Медиана</div><div class="sp-val" style="color:var(--accent2)" id="s-med">—</div></div>
+  <div class="stat-pill"><div class="sp-label">Мин</div><div class="sp-val g" id="s-min">—</div></div>
+  <div class="stat-pill"><div class="sp-label">Макс</div><div class="sp-val r" id="s-max">—</div></div>
+</div>
+
+<!-- AI -->
+<div class="ai-strip" id="ai-strip">
+  <div class="ai-strip-icon">🤖</div>
+  <div class="ai-strip-text" id="ai-text">Анализирую...</div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar" id="toolbar" style="display:none">
+  <span class="toolbar-count"><strong id="t-count">0</strong> объявлений</span>
+  <select class="sort-select" id="sort-select" onchange="renderCards()">
+    <option value="date">Новые</option>
+    <option value="price_asc">Цена ↑</option>
+    <option value="price_desc">Цена ↓</option>
+    <option value="deal">Выгодные</option>
+  </select>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-area" id="scroll-area">
+  <!-- HOME STATE -->
+  <div id="home-state" class="center-msg">
+    <div class="icon">📡</div>
+    <div class="title">KUFARSCAN</div>
+    <div class="sub">Введи запрос — найду реальные объявления с Куфара</div>
+    <div class="quick-chips">
+      <button class="qchip" onclick="quickSearch('iPhone 15')">📱 iPhone 15</button>
+      <button class="qchip" onclick="quickSearch('Samsung Galaxy')">📱 Samsung</button>
+      <button class="qchip" onclick="quickSearch('ноутбук')">💻 Ноутбук</button>
+      <button class="qchip" onclick="quickSearch('велосипед')">🚲 Велосипед</button>
+      <button class="qchip" onclick="quickSearch('PlayStation 5')">🎮 PS5</button>
+      <button class="qchip" onclick="quickSearch('автомобиль')">🚗 Авто</button>
+    </div>
+  </div>
+  <!-- CONTENT -->
+  <div id="content" style="display:none">
+    <div class="cards-grid" id="cards-grid"></div>
+    <div class="pg-bar" id="pg-bar"></div>
+  </div>
+  <!-- EMPTY -->
+  <div id="empty-state" class="center-msg" style="display:none">
+    <div class="icon">📭</div>
+    <div class="title">Ничего не найдено</div>
+    <div class="sub">Попробуй другой запрос или снять фильтры</div>
+  </div>
+  <!-- ERROR -->
+  <div id="error-state" class="center-msg" style="display:none">
+    <div class="icon">⚠️</div>
+    <div class="title">Ошибка</div>
+    <div class="error-box" id="error-box"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="maybeClose(event)">
+  <div class="modal-sheet" id="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="modal-inner"></div>
+  </div>
+</div>
+
+<script>
+// Telegram WebApp init
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.BackButton.onClick(() => {
+    if (document.getElementById('modal-overlay').classList.contains('active')) {
+      closeModal();
+    } else {
+      goHome();
+    }
+  });
+}
+
+// API URL — в продакшне это будет тот же сервер что раздаёт этот html
+const API = window.location.origin;
+
+let listings = [], currentPage = 1, selectedRegion = '', currentQuery = '';
+
+// Читаем ?q= из URL (если открыт из бота с предзаполненным запросом)
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('q');
+  if (q) {
+    document.getElementById('search-input').value = q;
+    fetchListings(q, 1);
+  }
+});
+
+function goHome() {
+  ['home-state'].forEach(id => document.getElementById(id).style.display='flex');
+  ['content','empty-state','error-state'].forEach(id => document.getElementById(id).style.display='none');
+  document.getElementById('filters-row').style.display='none';
+  document.getElementById('toolbar').style.display='none';
+  document.getElementById('stats-strip').classList.remove('visible');
+  document.getElementById('ai-strip').classList.remove('visible');
+  if (tg) tg.BackButton.hide();
+}
+
+function quickSearch(q) {
+  document.getElementById('search-input').value = q;
+  doSearch();
+}
+
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  fetchListings(q, 1);
+}
+
+async function fetchListings(query, page) {
+  currentQuery = query;
+  currentPage = page;
+
+  // Show loading skeletons
+  showLoading();
+
+  const params = new URLSearchParams({ q: query, page, size: 20 });
+  if (selectedRegion) params.set('region', selectedRegion);
+  const pf = document.getElementById('price-from').value;
+  const pt = document.getElementById('price-to').value;
+  const cond = document.getElementById('filter-condition').value;
+  if (pf) params.set('price_min', pf);
+  if (pt) params.set('price_max', pt);
+  if (cond) params.set('condition', cond);
+
+  try {
+    const res = await fetch(`${API}/search?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.ok) throw new Error(data.error || 'Ошибка сервера');
+
+    listings = data.listings || [];
+    renderStats(data.stats);
+    renderCards();
+    renderPagination(data.has_next);
+
+    document.getElementById('t-count').textContent = data.total_found || listings.length;
+    document.getElementById('filters-row').style.display='flex';
+    document.getElementById('toolbar').style.display='flex';
+    document.getElementById('home-state').style.display='none';
+    document.getElementById('error-state').style.display='none';
+    document.getElementById('content').style.display='block';
+
+    if (listings.length === 0) {
+      document.getElementById('empty-state').style.display='flex';
+      document.getElementById('content').style.display='none';
+    } else {
+      document.getElementById('empty-state').style.display='none';
+    }
+
+    if (tg) tg.BackButton.show();
+    getAI(query, data.stats);
+  } catch(e) {
+    showError(e.message);
+  }
+}
+
+function showLoading() {
+  document.getElementById('home-state').style.display='none';
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('error-state').style.display='none';
+  document.getElementById('content').style.display='block';
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = Array.from({length:8}, () => `
+    <div class="card">
+      <div class="card-img"><div class="skeleton" style="height:110px;width:100%;border-radius:0"></div></div>
+      <div class="card-body">
+        <div class="skeleton" style="height:12px;width:90%;margin-bottom:6px"></div>
+        <div class="skeleton" style="height:10px;width:60%"></div>
+      </div>
+    </div>`).join('');
+}
+
+function showError(msg) {
+  document.getElementById('content').style.display='none';
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('error-state').style.display='flex';
+  document.getElementById('error-box').innerHTML = `<strong>Ошибка:</strong> ${esc(msg)}`;
+}
+
+function renderStats(s) {
+  if (!s?.count) return;
+  document.getElementById('s-count').textContent = s.count;
+  document.getElementById('s-avg').textContent = s.avg?.toFixed(0) + ' BYN';
+  document.getElementById('s-med').textContent = s.median?.toFixed(0) + ' BYN';
+  document.getElementById('s-min').textContent = s.min?.toFixed(0);
+  document.getElementById('s-max').textContent = s.max?.toFixed(0);
+  document.getElementById('stats-strip').classList.add('visible');
+}
+
+function renderCards() {
+  const grid = document.getElementById('cards-grid');
+  if (!listings.length) return;
+
+  const prices = listings.filter(l=>l.price>0).map(l=>l.price);
+  const avgP = prices.length ? prices.reduce((a,b)=>a+b)/prices.length : 0;
+  const minP = prices.length ? Math.min(...prices) : 0;
+  const maxP = prices.length ? Math.max(...prices) : 1;
+
+  let sorted = [...listings];
+  const sort = document.getElementById('sort-select').value;
+  if (sort==='price_asc') sorted.sort((a,b)=>a.price-b.price);
+  else if (sort==='price_desc') sorted.sort((a,b)=>b.price-a.price);
+  else if (sort==='deal') sorted.sort((a,b)=>(b.is_deal?1:0)-(a.is_deal?1:0));
+
+  grid.innerHTML = sorted.map((l,i) => {
+    const isNew = l.condition === 'Новое';
+    const diff = l.price>0 && avgP>0 ? Math.round((l.price-avgP)/avgP*100) : null;
+    const imgHtml = l.thumbnail
+      ? `<img src="${l.thumbnail}" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="no-img">📷</div>`;
+    return `
+    <div class="card" style="animation-delay:${i*.03}s" onclick='openModal(${JSON.stringify(JSON.stringify(l))})'>
+      <div class="card-img">
+        ${imgHtml}
+        ${l.condition&&l.condition!=='—'?`<span class="cond-badge ${isNew?'new':'used'}">${l.condition}</span>`:''}
+        ${l.price>0?`<span class="card-price-badge">${l.price.toFixed(0)} BYN</span>`:''}
+        ${l.is_deal?'<span class="deal-badge">🔥 Выгодно</span>':''}
+      </div>
+      <div class="card-body">
+        <div class="card-title">${esc(l.title)}</div>
+        <div class="card-city">📍 ${esc(l.city)}</div>
+        ${diff!==null?`<div class="card-diff ${diff<0?'low':'high'}">${diff>0?'+':''}${diff}% от средней</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderPagination(hasNext) {
+  const pg = document.getElementById('pg-bar');
+  let html = '';
+  if (currentPage > 1)
+    html += `<button class="pg-btn" onclick="fetchListings('${currentQuery}',${currentPage-1})">← Назад</button>`;
+  html += `<button class="pg-btn active">${currentPage}</button>`;
+  if (hasNext)
+    html += `<button class="pg-btn" onclick="fetchListings('${currentQuery}',${currentPage+1})">Вперёд →</button>`;
+  pg.innerHTML = html;
+}
+
+async function getAI(query, stats) {
+  if (!stats?.count) return;
+  const strip = document.getElementById('ai-strip');
+  const text = document.getElementById('ai-text');
+  strip.classList.add('visible');
+  text.textContent = '⏳ Анализирую рынок...';
+  const prompt = `Эксперт по ценам Куфар.бай. Коротко (2–3 предложения): запрос "${query}", ${stats.count} объявлений, средняя ${stats.avg} BYN, медиана ${stats.median} BYN, диапазон ${stats.min}–${stats.max} BYN. Выгодно ли? Где граница хорошей цены?`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    text.textContent = data.content?.map(b=>b.text||'').join('')||'—';
+  } catch {
+    text.textContent = `Средняя цена ${stats.avg} BYN. Выгодная покупка — ниже ${Math.round(stats.avg*0.85)} BYN.`;
+  }
+}
+
+// ── MODAL ──────────────────────────────────────────────────────
+function openModal(jsonStr) {
+  const l = JSON.parse(jsonStr);
+  const imgs = l.images||[];
+  const mainSrc = imgs[0]||null;
+
+  const imgHtml = mainSrc
+    ? `<img class="modal-img" id="modal-main" src="${mainSrc}">`
+    : `<div class="modal-no-img">📷</div>`;
+  const gallery = imgs.length>1
+    ? `<div class="modal-gallery">${imgs.map((u,i)=>`<img src="${u}" class="${i===0?'active':''}" onclick="switchImg('${u}',this)">`).join('')}</div>`
+    : '';
+
+  const prices = listings.filter(x=>x.price>0).map(x=>x.price);
+  const avg = prices.length ? prices.reduce((a,b)=>a+b)/prices.length : 0;
+
+  document.getElementById('modal-inner').innerHTML = `
+    ${imgHtml}
+    ${gallery}
+    <div class="modal-body">
+      <div class="modal-title">${esc(l.title)}</div>
+      <div class="modal-price">${l.price>0?l.price.toFixed(2)+' BYN':'Договорная'}</div>
+      <div class="modal-fields">
+        <div class="mf"><div class="mf-l">Состояние</div><div class="mf-v">${l.condition||'—'}</div></div>
+        <div class="mf"><div class="mf-l">Город</div><div class="mf-v">📍 ${esc(l.city)}</div></div>
+        <div class="mf"><div class="mf-l">Дата</div><div class="mf-v">${fmtDate(l.date)}</div></div>
+        <div class="mf"><div class="mf-l">Просмотров</div><div class="mf-v">👁 ${l.views||'—'}</div></div>
+        ${avg>0&&l.price>0?`<div class="mf"><div class="mf-l">Средняя</div><div class="mf-v" style="color:var(--blue)">${avg.toFixed(0)} BYN</div></div>`:''}
+        ${l.price_diff_pct!=null?`<div class="mf"><div class="mf-l">Отклонение</div>
+          <div class="mf-v" style="color:${l.price_diff_pct<0?'var(--green)':'var(--red)'}">
+          ${l.price_diff_pct>0?'+':''}${l.price_diff_pct}%</div></div>`:''}
+      </div>
+      ${l.description?`<div class="modal-desc">${esc(l.description)}</div>`:''}
+      <a class="btn-open" href="${l.link}" target="_blank">🔗 Открыть на Куфаре</a>
+    </div>`;
+
+  document.getElementById('modal-overlay').classList.add('active');
+  if (tg) tg.BackButton.show();
+}
+
+function switchImg(url, el) {
+  const m = document.getElementById('modal-main');
+  if (m) m.src = url;
+  document.querySelectorAll('.modal-gallery img').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+}
+function maybeClose(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
+
+function setRegion(btn, r) {
+  document.querySelectorAll('.filter-chip').forEach(b=>{if(b.id!=='chip-filters')b.classList.remove('active');});
+  btn.classList.add('active');
+  selectedRegion = r;
+  if (currentQuery) fetchListings(currentQuery, 1);
+}
+
+function toggleFilterPanel() {
+  const p = document.getElementById('filter-panel');
+  p.classList.toggle('open');
+  document.getElementById('chip-filters').classList.toggle('active', p.classList.contains('open'));
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('ru-RU',{day:'2-digit',month:'short'});}catch{return d;}}
+
+document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+</script>
+</body>
+</html>
